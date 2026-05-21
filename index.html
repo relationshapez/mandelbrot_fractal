@@ -1,0 +1,808 @@
+<!--
+  Copyright (c) 2026 Alan Miller
+  Released under the MIT License
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Relationshapez: Mandelbrot Fractal</title>
+<style>
+  :root {
+    --gw-blue: #033C5A;
+    --gw-buff: #D6BF91;
+    --gw-buff-dark: #AA9868;
+    --bg: #F7F5F0;
+    --panel: #FFFFFF;
+    --text: #1F2937;
+    --muted: #6B7280;
+    --line: #D7DDE4;
+    --shadow: 0 4px 18px rgba(0,0,0,0.08);
+    --radius: 18px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  body { min-height: 100vh; }
+
+  .app {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 14px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 14px;
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+    margin-bottom: 12px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field label {
+    font-weight: 700;
+    color: var(--gw-blue);
+    font-size: 0.98rem;
+  }
+
+  .field input {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    font: inherit;
+    color: var(--text);
+    background: #fff;
+  }
+
+  .actions,
+  .status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 56px;
+    height: 30px;
+  }
+
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+  }
+
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    transition: background 0.2s ease, border-color 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  .slider::before {
+    content: '';
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    left: 3px;
+    top: 3px;
+    background: var(--gw-buff);
+    border-radius: 50%;
+    transition: transform 0.2s ease, background 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  }
+
+  .switch input:checked + .slider {
+    background: var(--gw-blue);
+    border-color: var(--gw-blue);
+  }
+
+  .switch input:checked + .slider::before {
+    transform: translateX(26px);
+    background: #fff;
+  }
+
+  .switch input:focus-visible + .slider {
+    outline: 2px solid var(--gw-buff-dark);
+    outline-offset: 2px;
+  }
+
+  .actions {
+    margin-bottom: 12px;
+    align-items: center;
+  }
+
+  .spacer {
+    flex: 1 1 auto;
+  }
+
+  .mode-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--gw-blue);
+    font-weight: 700;
+  }
+
+  .mode-switch-label {
+    font-size: 0.95rem;
+  }
+
+  .btn {
+    border: 0;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--gw-blue);
+    background: var(--gw-buff);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    transition: transform 0.06s ease, opacity 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .btn:active { transform: translateY(1px); }
+  .btn.secondary {
+    background: #fff;
+    border: 1px solid var(--line);
+  }
+  .btn.small {
+    padding: 6px 10px;
+    font-size: 0.9rem;
+  }
+  .btn:disabled {
+    cursor: default;
+    opacity: 0.6;
+    transform: none;
+  }
+
+  .status-row {
+    gap: 8px 16px;
+    margin-bottom: 10px;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .status-main {
+    font-weight: 600;
+    color: var(--gw-blue);
+  }
+
+  .viewer-wrap {
+    background: #fff;
+    border-radius: 18px;
+    border: 1px solid var(--line);
+    overflow: hidden;
+  }
+
+  .canvas-shell {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: #000;
+    touch-action: none;
+    user-select: none;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .zoom-box {
+    position: absolute;
+    border: 2px dashed var(--gw-buff);
+    background: rgba(214, 191, 145, 0.18);
+    box-shadow: inset 0 0 0 1px rgba(3, 60, 90, 0.25);
+    display: none;
+    pointer-events: none;
+  }
+
+
+  @media (max-width: 720px) {
+    .app { padding: 10px; }
+    .panel { padding: 12px; }
+    .controls { grid-template-columns: 1fr; }
+    .btn { flex: 1 1 auto; text-align: center; }
+    .mode-switch { width: 100%; justify-content: flex-start; }
+    .status-row { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="panel">
+      <div class="controls">
+        <div class="field">
+          <label for="centerReal">Center point (real)</label>
+          <input id="centerReal" type="number" step="0.1" min="-1.5" max="0.5" value="-0.5" inputmode="decimal" />
+        </div>
+        <div class="field">
+          <label for="centerImag">Center point (imaginary)</label>
+          <input id="centerImag" type="number" step="0.1" min="-1" max="1" value="0" inputmode="decimal" />
+        </div>
+        <div class="field">
+          <label for="pixelResolution">Pixel resolution</label>
+          <input id="pixelResolution" type="number" step="0.001" min="0.0000001" value="0.005" inputmode="decimal" />
+        </div>
+        <div class="field">
+          <label for="pixelCount">Number of pixels</label>
+          <input id="pixelCount" type="number" step="1" min="128" value="700" inputmode="numeric" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" id="renderBtn" type="button">Create Image</button>
+        <div class="mode-switch" aria-label="Interaction mode">
+          <span class="mode-switch-label">Pan</span>
+          <label class="switch">
+            <input id="modeToggle" type="checkbox" checked aria-label="Toggle between Pan and Zoom" />
+            <span class="slider"></span>
+          </label>
+          <span class="mode-switch-label">Zoom</span>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn secondary" id="homeBtn" type="button">Reset</button>
+      </div>
+
+      <div class="status-row">
+        <div class="status-main" id="statusText">Ready.</div>
+        <button class="btn secondary small" id="cancelBtn" type="button" hidden>Cancel</button>
+      </div>
+
+      <div class="viewer-wrap">
+        <div class="canvas-shell" id="canvasShell" aria-label="Mandelbrot fractal explorer">
+          <canvas id="fractalCanvas" width="700" height="700"></canvas>
+          <div class="zoom-box" id="zoomBox"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+(() => {
+  const el = {
+    centerReal: document.getElementById('centerReal'),
+    centerImag: document.getElementById('centerImag'),
+    pixelResolution: document.getElementById('pixelResolution'),
+    pixelCount: document.getElementById('pixelCount'),
+    modeToggle: document.getElementById('modeToggle'),
+    renderBtn: document.getElementById('renderBtn'),
+    homeBtn: document.getElementById('homeBtn'),
+    statusText: document.getElementById('statusText'),
+    cancelBtn: document.getElementById('cancelBtn'),
+    canvasShell: document.getElementById('canvasShell'),
+    canvas: document.getElementById('fractalCanvas'),
+    zoomBox: document.getElementById('zoomBox'),
+  };
+
+  const ctx = el.canvas.getContext('2d', { alpha: false });
+
+  const HOME_VIEW = {
+    centerReal: -0.5,
+    centerImag: 0,
+    pixelResolution: 0.005,
+    pixelCount: 700,
+  };
+
+  const state = {
+    mode: 'zoom',
+    centerReal: HOME_VIEW.centerReal,
+    centerImag: HOME_VIEW.centerImag,
+    pixelResolution: HOME_VIEW.pixelResolution,
+    pixelCount: HOME_VIEW.pixelCount,
+    rendering: false,
+    renderToken: 0,
+    pointers: new Map(),
+    activeGesture: null,
+    dragStartX: 0,
+    dragStartY: 0,
+    dragStartCenterReal: 0,
+    dragStartCenterImag: 0,
+    boxStartX: 0,
+    boxStartY: 0,
+    boxCurrentX: 0,
+    boxCurrentY: 0,
+    pinchStartDistance: null,
+    pinchStartResolution: null,
+    pinchAnchor: null,
+    pinchCenterReal: null,
+    pinchCenterImag: null,
+    lastTapTime: 0,
+    pointerDownTime: 0,
+    pointerMoved: false,
+  };
+
+  function clampPixelCount(n) {
+    n = Math.round(Number(n));
+    if (!Number.isFinite(n)) return 700;
+    return Math.max(128, n);
+  }
+
+  function positiveResolution(x) {
+    x = Number(x);
+    if (!Number.isFinite(x) || x <= 0) return 0.005;
+    return x;
+  }
+
+  function finiteNumber(x, fallback = 0) {
+    x = Number(x);
+    return Number.isFinite(x) ? x : fallback;
+  }
+
+  function formatNum(x) {
+    if (!Number.isFinite(x)) return '0';
+    const abs = Math.abs(x);
+    if (abs === 0) return '0';
+    if (abs >= 1000 || abs < 0.0001) return x.toExponential(6);
+    return Number(x.toFixed(10)).toString();
+  }
+
+  function updateInputsFromState() {
+    el.centerReal.value = formatNum(state.centerReal);
+    el.centerImag.value = formatNum(state.centerImag);
+    el.pixelResolution.value = formatNum(state.pixelResolution);
+    el.pixelCount.value = String(state.pixelCount);
+  }
+
+  function resizeCanvasPixels() {
+    const n = clampPixelCount(state.pixelCount);
+    state.pixelCount = n;
+    if (el.canvas.width !== n || el.canvas.height !== n) {
+      el.canvas.width = n;
+      el.canvas.height = n;
+    }
+  }
+
+  function setStatus(msg) {
+    el.statusText.textContent = msg;
+  }
+
+  function startRenderingUI() {
+    state.rendering = true;
+    el.renderBtn.disabled = true;
+    el.cancelBtn.hidden = false;
+    el.cancelBtn.disabled = false;
+  }
+
+  function finishRenderingUI(msg) {
+    state.rendering = false;
+    el.renderBtn.disabled = false;
+    el.cancelBtn.hidden = true;
+    el.cancelBtn.disabled = true;
+    if (msg) setStatus(msg);
+  }
+
+  function cancelRender() {
+    if (!state.rendering) return;
+    state.renderToken += 1;
+    finishRenderingUI('Rendering cancelled.');
+  }
+
+  function clearSelectedMessage() {}
+
+  function setSelectedMessage(msg) {}
+
+  function setSelectedPoint(real, imag) {
+    const realText = formatNum(real);
+    const imagText = formatNum(imag);
+    el.centerReal.value = realText;
+    el.centerImag.value = imagText;
+  }
+
+  function updateModeUI() {
+    el.modeToggle.checked = (state.mode === 'zoom');
+  }
+
+  function setMode(mode) {
+    state.mode = (mode === 'pan') ? 'pan' : 'zoom';
+    hideZoomBox();
+    state.activeGesture = null;
+    state.pointerMoved = false;
+    updateModeUI();
+  }
+
+  function readViewFromInputs() {
+    state.centerReal = finiteNumber(el.centerReal.value, state.centerReal);
+    state.centerImag = finiteNumber(el.centerImag.value, state.centerImag);
+    state.pixelResolution = positiveResolution(el.pixelResolution.value);
+    state.pixelCount = clampPixelCount(el.pixelCount.value);
+    updateInputsFromState();
+  }
+
+  function canvasPointToComplex(px, py, centerReal = state.centerReal, centerImag = state.centerImag, res = state.pixelResolution) {
+    const n = state.pixelCount;
+    const half = (n - 1) / 2;
+    return {
+      real: centerReal + (px - half) * res,
+      imag: centerImag - (py - half) * res,
+    };
+  }
+
+  function screenToCanvas(event) {
+    const rect = el.canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) * (state.pixelCount / rect.width);
+    const y = (event.clientY - rect.top) * (state.pixelCount / rect.height);
+    return { x, y, rect };
+  }
+
+  function hideZoomBox() {
+    el.zoomBox.style.display = 'none';
+  }
+
+  function updateZoomBox(x0, y0, x1, y1) {
+    const rect = el.canvas.getBoundingClientRect();
+    const sx = rect.width / state.pixelCount;
+    const sy = rect.height / state.pixelCount;
+    const left = Math.min(x0, x1) * sx;
+    const top = Math.min(y0, y1) * sy;
+    const width = Math.max(1, Math.abs(x1 - x0) * sx);
+    const height = Math.max(1, Math.abs(y1 - y0) * sy);
+    el.zoomBox.style.left = `${left}px`;
+    el.zoomBox.style.top = `${top}px`;
+    el.zoomBox.style.width = `${width}px`;
+    el.zoomBox.style.height = `${height}px`;
+    el.zoomBox.style.display = 'block';
+  }
+
+  function applyBoxZoom() {
+    const x0 = state.boxStartX;
+    const y0 = state.boxStartY;
+    const x1 = state.boxCurrentX;
+    const y1 = state.boxCurrentY;
+    const width = Math.abs(x1 - x0);
+    const height = Math.abs(y1 - y0);
+    if (width < 2 || height < 2) return false;
+
+    const cx = (x0 + x1) / 2;
+    const cy = (y0 + y1) / 2;
+    const center = canvasPointToComplex(cx, cy);
+    const selectedSpanPixels = Math.max(width, height);
+    const denom = Math.max(1, state.pixelCount - 1);
+    const newResolution = positiveResolution(state.pixelResolution * (selectedSpanPixels / denom));
+
+    state.centerReal = center.real;
+    state.centerImag = center.imag;
+    state.pixelResolution = newResolution;
+    updateInputsFromState();
+    setSelectedMessage(`Zoomed to box centered at (${formatNum(center.real)}, ${formatNum(center.imag)}).`);
+    return true;
+  }
+
+  function mandelbrotIter(cr, ci, maxIter) {
+    let zr = 0;
+    let zi = 0;
+    let zr2 = 0;
+    let zi2 = 0;
+    let iter = 0;
+    while (iter < maxIter && zr2 + zi2 <= 4) {
+      zi = 2 * zr * zi + ci;
+      zr = zr2 - zi2 + cr;
+      zr2 = zr * zr;
+      zi2 = zi * zi;
+      iter++;
+    }
+    if (iter >= maxIter) return { iter, smooth: maxIter };
+    const mag = Math.sqrt(zr2 + zi2);
+    const smooth = iter + 1 - Math.log2(Math.log2(Math.max(mag, 2)));
+    return { iter, smooth };
+  }
+
+  function colorForPoint(cr, ci, maxIter) {
+    const out = mandelbrotIter(cr, ci, maxIter);
+    if (out.iter >= maxIter) return [3, 60, 90];
+    const t = Math.max(0, Math.min(1, out.smooth / maxIter));
+
+    const r = Math.round(214 * (1 - t) + 3 * t);
+    const g = Math.round(191 * (1 - t) + 60 * t);
+    const b = Math.round(145 * (1 - t) + 90 * t);
+
+    const glow = Math.sin(6.28318 * (0.85 * t + 0.15)) * 0.12 + 0.88;
+    return [
+      Math.max(0, Math.min(255, Math.round(r * glow))),
+      Math.max(0, Math.min(255, Math.round(g * glow))),
+      Math.max(0, Math.min(255, Math.round(b * glow)))
+    ];
+  }
+
+  function estimateMaxIter() {
+    const zoom = 0.005 / state.pixelResolution;
+    const iter = 80 + Math.round(18 * Math.log2(Math.max(1, zoom)));
+    return Math.max(80, Math.min(1200, iter));
+  }
+
+  async function renderFractal() {
+    const token = ++state.renderToken;
+    startRenderingUI();
+    setStatus('Rendering...');
+
+    resizeCanvasPixels();
+    updateInputsFromState();
+
+    const n = state.pixelCount;
+    const image = ctx.createImageData(n, n);
+    const data = image.data;
+    const maxIter = estimateMaxIter();
+    const half = (n - 1) / 2;
+
+    let y = 0;
+    const rowsPerChunk = n >= 1200 ? 6 : n >= 800 ? 12 : 18;
+
+    while (y < n) {
+      if (token !== state.renderToken) return false;
+      const yEnd = Math.min(n, y + rowsPerChunk);
+      for (; y < yEnd; y++) {
+        const ci = state.centerImag - (y - half) * state.pixelResolution;
+        for (let x = 0; x < n; x++) {
+          const cr = state.centerReal + (x - half) * state.pixelResolution;
+          const [r, g, b] = colorForPoint(cr, ci, maxIter);
+          const idx = 4 * (y * n + x);
+          data[idx] = r;
+          data[idx + 1] = g;
+          data[idx + 2] = b;
+          data[idx + 3] = 255;
+        }
+      }
+      if (token !== state.renderToken) return false;
+      ctx.putImageData(image, 0, 0);
+      setStatus(`Rendering... ${Math.round(100 * y / n)}%`);
+      await new Promise(resolve => requestAnimationFrame(resolve));
+    }
+
+    if (token !== state.renderToken) return false;
+    ctx.putImageData(image, 0, 0);
+    finishRenderingUI(`Done. Iterations: ${maxIter}.`);
+    return true;
+  }
+
+  function scheduleRender() {
+    renderFractal().catch(() => {
+      finishRenderingUI('Unable to render.');
+    });
+  }
+
+  function applyHomeView() {
+    state.centerReal = HOME_VIEW.centerReal;
+    state.centerImag = HOME_VIEW.centerImag;
+    state.pixelResolution = HOME_VIEW.pixelResolution;
+    state.pixelCount = HOME_VIEW.pixelCount;
+    resizeCanvasPixels();
+    updateInputsFromState();
+    clearSelectedMessage();
+  }
+
+  function zoomAtCanvasPoint(pixelX, pixelY, zoomFactor) {
+    const before = canvasPointToComplex(pixelX, pixelY);
+    state.pixelResolution = positiveResolution(state.pixelResolution * zoomFactor);
+    const n = state.pixelCount;
+    const half = (n - 1) / 2;
+    state.centerReal = before.real - (pixelX - half) * state.pixelResolution;
+    state.centerImag = before.imag + (pixelY - half) * state.pixelResolution;
+    updateInputsFromState();
+    scheduleRender();
+  }
+
+  function handleTapSelection(pos) {
+    const picked = canvasPointToComplex(pos.x, pos.y);
+    setSelectedPoint(picked.real, picked.imag);
+    const now = Date.now();
+    if (now - state.lastTapTime < 300) {
+      zoomAtCanvasPoint(pos.x, pos.y, 0.6);
+      state.lastTapTime = 0;
+    } else {
+      state.lastTapTime = now;
+    }
+  }
+
+  el.modeToggle.addEventListener('change', () => {
+    setMode(el.modeToggle.checked ? 'zoom' : 'pan');
+  });
+
+  el.renderBtn.addEventListener('click', () => {
+    readViewFromInputs();
+    scheduleRender();
+  });
+
+  el.homeBtn.addEventListener('click', () => {
+    applyHomeView();
+    scheduleRender();
+  });
+
+  el.cancelBtn.addEventListener('click', () => {
+    cancelRender();
+  });
+
+  el.canvas.addEventListener('wheel', (event) => {
+    event.preventDefault();
+    const { x, y } = screenToCanvas(event);
+    const factor = event.deltaY < 0 ? 0.8 : 1.25;
+    zoomAtCanvasPoint(x, y, factor);
+  }, { passive: false });
+
+  el.canvas.addEventListener('pointerdown', (event) => {
+    el.canvas.setPointerCapture(event.pointerId);
+    const pos = screenToCanvas(event);
+    state.pointers.set(event.pointerId, { x: pos.x, y: pos.y, clientX: event.clientX, clientY: event.clientY });
+
+    if (state.pointers.size === 1) {
+      state.pointerDownTime = Date.now();
+      state.pointerMoved = false;
+      if (state.mode === 'pan') {
+        state.activeGesture = 'pan';
+        state.dragStartX = pos.x;
+        state.dragStartY = pos.y;
+        state.dragStartCenterReal = state.centerReal;
+        state.dragStartCenterImag = state.centerImag;
+      } else {
+        state.activeGesture = 'box';
+        state.boxStartX = pos.x;
+        state.boxStartY = pos.y;
+        state.boxCurrentX = pos.x;
+        state.boxCurrentY = pos.y;
+        hideZoomBox();
+      }
+    } else if (state.pointers.size === 2) {
+      const pts = [...state.pointers.values()];
+      const dx = pts[0].x - pts[1].x;
+      const dy = pts[0].y - pts[1].y;
+      state.activeGesture = 'pinch';
+      state.pointerMoved = true;
+      state.pinchStartDistance = Math.hypot(dx, dy) || 1;
+      state.pinchStartResolution = state.pixelResolution;
+      state.pinchCenterReal = state.centerReal;
+      state.pinchCenterImag = state.centerImag;
+      state.pinchAnchor = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+      hideZoomBox();
+    }
+  });
+
+  el.canvas.addEventListener('pointermove', (event) => {
+    if (!state.pointers.has(event.pointerId)) return;
+    const pos = screenToCanvas(event);
+    state.pointers.set(event.pointerId, { x: pos.x, y: pos.y, clientX: event.clientX, clientY: event.clientY });
+
+    if (state.activeGesture === 'pan' && state.pointers.size === 1) {
+      const dx = pos.x - state.dragStartX;
+      const dy = pos.y - state.dragStartY;
+      if (Math.hypot(dx, dy) > 6) state.pointerMoved = true;
+      state.centerReal = state.dragStartCenterReal - dx * state.pixelResolution;
+      state.centerImag = state.dragStartCenterImag + dy * state.pixelResolution;
+      updateInputsFromState();
+    } else if (state.activeGesture === 'box' && state.pointers.size === 1) {
+      const dx = pos.x - state.boxStartX;
+      const dy = pos.y - state.boxStartY;
+      if (Math.hypot(dx, dy) > 6) state.pointerMoved = true;
+      state.boxCurrentX = pos.x;
+      state.boxCurrentY = pos.y;
+      if (state.pointerMoved) {
+        updateZoomBox(state.boxStartX, state.boxStartY, state.boxCurrentX, state.boxCurrentY);
+      }
+    } else if (state.activeGesture === 'pinch' && state.pointers.size === 2) {
+      const pts = [...state.pointers.values()];
+      const dx = pts[0].x - pts[1].x;
+      const dy = pts[0].y - pts[1].y;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const anchorX = (pts[0].x + pts[1].x) / 2;
+      const anchorY = (pts[0].y + pts[1].y) / 2;
+      const scale = state.pinchStartDistance / distance;
+      state.pixelResolution = positiveResolution(state.pinchStartResolution * scale);
+
+      const n = state.pixelCount;
+      const half = (n - 1) / 2;
+      const anchorComplex = canvasPointToComplex(state.pinchAnchor.x, state.pinchAnchor.y, state.pinchCenterReal, state.pinchCenterImag, state.pinchStartResolution);
+      state.centerReal = anchorComplex.real - (anchorX - half) * state.pixelResolution;
+      state.centerImag = anchorComplex.imag + (anchorY - half) * state.pixelResolution;
+      updateInputsFromState();
+    }
+  });
+
+  function endPointer(event) {
+    const pos = screenToCanvas(event);
+    const endingGesture = state.activeGesture;
+    const tapCandidate = (endingGesture === 'pan' || endingGesture === 'box') && !state.pointerMoved && (Date.now() - state.pointerDownTime < 300) && state.pointers.size === 1;
+
+    if (state.pointers.has(event.pointerId)) {
+      state.pointers.delete(event.pointerId);
+    }
+
+    if (state.pointers.size === 0) {
+      hideZoomBox();
+      if (endingGesture === 'pan') {
+        if (state.pointerMoved) {
+          scheduleRender();
+        } else if (tapCandidate) {
+          handleTapSelection(pos);
+        }
+        state.activeGesture = null;
+      } else if (endingGesture === 'box') {
+        if (state.pointerMoved) {
+          if (applyBoxZoom()) scheduleRender();
+        } else if (tapCandidate) {
+          handleTapSelection(pos);
+        }
+        state.activeGesture = null;
+      } else if (endingGesture === 'pinch') {
+        scheduleRender();
+        state.activeGesture = null;
+      } else {
+        state.activeGesture = null;
+      }
+      state.pointerMoved = false;
+    } else if (state.pointers.size === 1) {
+      const remaining = [...state.pointers.values()][0];
+      state.pointerDownTime = Date.now();
+      state.pointerMoved = false;
+      if (state.mode === 'pan') {
+        state.activeGesture = 'pan';
+        state.dragStartX = remaining.x;
+        state.dragStartY = remaining.y;
+        state.dragStartCenterReal = state.centerReal;
+        state.dragStartCenterImag = state.centerImag;
+      } else {
+        state.activeGesture = 'box';
+        state.boxStartX = remaining.x;
+        state.boxStartY = remaining.y;
+        state.boxCurrentX = remaining.x;
+        state.boxCurrentY = remaining.y;
+        hideZoomBox();
+      }
+    }
+  }
+
+  el.canvas.addEventListener('pointerup', endPointer);
+  el.canvas.addEventListener('pointercancel', endPointer);
+  el.canvas.addEventListener('pointerleave', (event) => {
+    if (event.buttons === 0 && state.pointers.has(event.pointerId)) endPointer(event);
+  });
+
+  [el.centerReal, el.centerImag, el.pixelResolution, el.pixelCount].forEach(input => {
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        readViewFromInputs();
+        scheduleRender();
+      }
+    });
+  });
+
+  applyHomeView();
+  resizeCanvasPixels();
+  updateInputsFromState();
+  updateModeUI();
+  scheduleRender();
+})();
+</script>
+</body>
+</html>
