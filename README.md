@@ -47,7 +47,7 @@ The HTML tool lets the user:
 
 Access the tool at:
 
-`https://relationshapez.github.io/mandelbrot/`
+`https://relationshapez.github.io/mandelbrot_fractal/`
 
 ## Input meanings
 
